@@ -1,0 +1,59 @@
+version: '3.7'
+services:
+  mysql-master:
+    image: mysql:latest
+    container_name: mysql_master_container
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: user
+      MYSQL_PASSWORD: userpassword
+    volumes:
+      - ./mysql_master_data:/var/lib/mysql
+      - ./master.cnf:/etc/mysql/conf.d/master.cnf
+      - ./master_init.sql:/docker-entrypoint-initdb.d/master_init.sql
+    ports:
+      - "3306:3306"
+
+  mysql-slave:
+    image: mysql:latest
+    container_name: mysql_slave_container
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - ./mysql_slave_data:/var/lib/mysql
+      - ./slave.cnf:/etc/mysql/conf.d/slave.cnf
+      - ./slave_init.sh:/docker-entrypoint-initdb.d/slave_init.sh
+    depends_on:
+      - mysql-master
+    ports:
+      - "3307:3306"
+
+  php-apache:
+    image: php:7.4-apache
+    container_name: php_apache_container
+    volumes:
+      - ./html:/var/www/html
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql-master
+    command: >
+      bash -c "docker-php-ext-install mysqli && apache2-foreground"
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_container
+    ports:
+      - "8081:80"
+    volumes:
+      - ./web:/usr/share/nginx/html
+    depends_on:
+      - php-apache
+
+  respaldo:
+    image: alpine
+    container_name: respaldo_container
+    volumes:
+      - ./backups:/backups
+    command: sh -c "while true; do sleep 86400; done"
